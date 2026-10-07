@@ -1,0 +1,37 @@
+name: Backend CI
+
+on:
+  push:
+    paths: ["backend/**", "backend-tests/**"]
+  pull_request:
+    paths: ["backend/**", "backend-tests/**"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: "YourStrong!Passw0rd"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Passw0rd' -Q 'SELECT 1'"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
+    env:
+      ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=CicdDemoDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet restore
+      - run: dotnet build --no-restore --configuration Release
+      - run: dotnet tool install --global dotnet-ef
+      - run: dotnet ef database update --project backend/Api.csproj
+      - run: dotnet test --no-build --configuration Release
